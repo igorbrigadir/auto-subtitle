@@ -18,6 +18,8 @@ def main():
                         default=".", help="directory to save the outputs")
     parser.add_argument("--verbose", type=str2bool, default=False,
                         help="Whether to print out the progress and debug messages")
+    parser.add_argument("--keep", type=str2bool, default=False,
+                        help="Whether to keep video and srt subtitles separate after conversion")
 
     parser.add_argument("--task", type=str, default="transcribe", choices=[
                         "transcribe", "translate"], help="whether to perform X->X speech recognition ('transcribe') or X->English translation ('translate')")
@@ -25,6 +27,7 @@ def main():
     args = parser.parse_args().__dict__
     model_name: str = args.pop("model")
     output_dir: str = args.pop("output_dir")
+    keep_files: bool = args.pop("keep")
     os.makedirs(output_dir, exist_ok=True)
 
     if model_name.endswith(".en"):
@@ -50,7 +53,7 @@ def main():
 
         stderr = ffmpeg.concat(
             video.filter('subtitles', srt_path, force_style="OutlineColour=&H40000000,BorderStyle=3"), audio, v=1, a=1
-        ).output(out_path).run(quiet=True, overwrite_output=True)
+        ).output(out_path).run(quiet=True, overwrite_output=keep_files)
 
         print(f"Saved subtitled video to {os.path.abspath(out_path)}.")
 
