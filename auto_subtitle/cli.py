@@ -19,7 +19,7 @@ def main():
     parser.add_argument("--verbose", type=str2bool, default=False,
                         help="Whether to print out the progress and debug messages")
     parser.add_argument("--keep", type=str2bool, default=False,
-                        help="Whether to keep video and srt subtitles separate after conversion")
+                        help="Keep extracted audio and srt subtitles after conversion")
 
     parser.add_argument("--task", type=str, default="transcribe", choices=[
                         "transcribe", "translate"], help="whether to perform X->X speech recognition ('transcribe') or X->English translation ('translate')")
@@ -27,8 +27,9 @@ def main():
     args = parser.parse_args().__dict__
     model_name: str = args.pop("model")
     output_dir: str = args.pop("output_dir")
-    keep_files: bool = args.pop("keep")
+    keep: bool = args.pop("keep")
     os.makedirs(output_dir, exist_ok=True)
+    temp_dir = output_dir if keep else tempfile.gettempdir()
 
     if model_name.endswith(".en"):
         warnings.warn(
@@ -36,9 +37,9 @@ def main():
         args["language"] = "en"
 
     model = whisper.load_model(model_name)
-    audios = get_audio(args.pop("video"))
+    audios = get_audio(args.pop("video"), temp_dir)
     subtitles = get_subtitles(
-        audios, lambda audio_path: model.transcribe(audio_path, **args)
+        audios, temp_dir, lambda audio_path: model.transcribe(audio_path, **args)
     )
     # bash command to download a youtube video with `youtube-dl` and save it as `video.mp4`:
     # youtube-dl -f 22 -o video.mp4 https://www.youtube.com/watch?v=QH2-TGUlwu4
@@ -53,13 +54,12 @@ def main():
 
         stderr = ffmpeg.concat(
             video.filter('subtitles', srt_path, force_style="OutlineColour=&H40000000,BorderStyle=3"), audio, v=1, a=1
-        ).output(out_path).run(quiet=True, overwrite_output=keep_files)
+        ).output(out_path).run(quiet=True, overwrite_output=True)
 
         print(f"Saved subtitled video to {os.path.abspath(out_path)}.")
 
 
-def get_audio(paths):
-    temp_dir = tempfile.gettempdir()
+def get_audio(paths: list, temp_dir: str):
 
     audio_paths = {}
 
@@ -77,8 +77,7 @@ def get_audio(paths):
     return audio_paths
 
 
-def get_subtitles(audio_paths: list, transcribe: callable):
-    temp_dir = tempfile.gettempdir()
+def get_subtitles(audio_paths: list, temp_dir: str, transcribe: callable):
     subtitles_path = {}
 
     for path, audio_path in audio_paths.items():
